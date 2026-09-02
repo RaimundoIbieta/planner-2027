@@ -246,7 +246,7 @@ function moodBar(month, path) {
     <img src="assets/mood-${ch.id}.jpg" alt="Escala de ánimo de ${esc(ch.name)}">
     <div class="mood-hits">${hits}</div>
   </div>
-  <p class="hint">${esc(ch.name)} · toca el recuadro del nivel 1 al 5</p>`;
+  <p class="hint mood-hint">Toca el nivel de ${esc(ch.name)}</p>`;
 }
 
 function gradePicker(path) {
@@ -263,6 +263,10 @@ function gradePicker(path) {
 
 function officialArt(month) {
   return `assets/cal-${pad(month)}.jpg`;
+}
+
+function heroFrame(src, alt = "") {
+  return `<figure class="hero-frame"><img src="${src}" alt="${esc(alt)}"></figure>`;
 }
 
 function eventList(date) {
@@ -455,7 +459,7 @@ function renderMonth(month) {
       </h1>
       <a class="nav-arrow" href="#/mes/${next}">›</a>
     </div>
-    <img class="hero-banner" src="${officialArt(month)}" alt="${esc(saga.title)}">
+    ${heroFrame(officialArt(month), saga.title)}
     ${fullCalendar(month)}
     <p class="hint" style="margin:8px 0 12px">Toca un día para escribir o agregar un evento. El punto dorado marca notas; las tiras son eventos.</p>
     <details class="lore">
@@ -485,7 +489,7 @@ function renderMonthClose(month) {
   ui.quarter = q;
   return `<section class="sheet">
     ${monthTabs(month, "cierre")}
-    <img class="hero-banner" src="${officialArt(month)}" alt="">
+    ${heroFrame(officialArt(month), saga.title)}
     <p class="kicker">${esc(saga.arc)}</p>
     <h1 class="page-title">Cierre de ${MONTHS[month - 1]}</h1>
     <p class="q-blurb">${esc(saga.title)}</p>
@@ -542,7 +546,7 @@ function renderQuarterClose(q) {
       <a href="#/ano">Año</a>
       ${[1, 2, 3, 4].map((n) => `<a class="${n === q ? "active" : ""}" href="#/qcierre/${n}">Q${n}</a>`).join("")}
     </nav>
-    <img class="hero-banner" src="assets/qend-${pad(q)}.jpg" alt="Término Q${q}">
+    ${heroFrame(`assets/qend-${pad(q)}.jpg`, `Término Q${q}`)}
     <p class="kicker">Término de arco</p>
     <h1 class="page-title">Cierre Q${q}</h1>
     <p class="q-blurb">${esc(lore.name)}. ${esc(lore.blurb)}</p>

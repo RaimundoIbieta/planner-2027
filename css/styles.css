@@ -968,16 +968,32 @@ details.lore[open] summary::after { content: " ▴"; }
   margin: 12px 0 8px;
 }
 
-.hero-banner {
-  width: 100%;
-  height: auto;
-  max-height: none;
-  object-fit: contain;
-  object-position: center;
-  background: var(--sea);
+.hero-frame {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 12px;
+  padding: 8px;
+  background: #051c38;
   border: 2px solid #111;
   border-radius: 12px;
-  margin-bottom: 12px;
+}
+
+.hero-frame img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+@media (min-width: 700px) {
+  .hero-frame img { max-height: 240px; }
+  .mood-scale { width: min(100%, 300px); }
 }
 
 .mood-row, .nakama-row {
@@ -1110,16 +1126,22 @@ details.lore[open] summary::after { content: " ▴"; }
 
 .mood-scale {
   position: relative;
-  border: 2px solid #111;
-  border-radius: 12px;
+  width: min(100%, 268px);
+  margin: 0 auto;
+  border-radius: 10px;
   overflow: hidden;
-  background: #111;
+  background: transparent;
 }
 
 .mood-scale img {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.mood-hint {
+  text-align: center;
+  margin: 6px 0 0;
 }
 
 .mood-hits {
