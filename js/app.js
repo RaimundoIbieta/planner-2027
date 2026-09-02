@@ -84,7 +84,9 @@ function loadState() {
 }
 
 function persist() {
+  if (!skipCloudPush) state.updatedAt = Date.now();
   localStorage.setItem(KEY, JSON.stringify(state));
+  cloudSchedulePush();
 }
 
 function scheduleSave() {
@@ -625,6 +627,18 @@ function renderProfile() {
       ${field("personal.emergencia", "Nombre y teléfono", false)}
     </div>
     <div class="box" style="margin-top:10px">
+      <h3>Nube (iPhone y Chrome)</h3>
+      <p class="hint">${
+        cloudStatus() === "ok"
+          ? "Conectada. Lo que escribas aquí aparece en tus otros dispositivos al recargar."
+          : "Todavía no está conectada. Pulsa Salir, entra otra vez con tu clave y se crea sola."
+      }</p>
+      ${lastCloudError ? `<p class="login-error">${esc(lastCloudError)}</p>` : ""}
+      <div class="actions" style="margin-top:10px">
+        <button class="btn" type="button" data-act="cloud-sync">Sincronizar ahora</button>
+      </div>
+    </div>
+    <div class="box" style="margin-top:10px">
       <h3>Google Calendar</h3>
       <p class="hint">Esto no es tu Gmail ni tu contraseña. Google pide una llave para que esta página pueda crear eventos en tu calendario. Se hace una sola vez.</p>
       <ol class="hint-list">
@@ -648,7 +662,7 @@ function renderProfile() {
       <button class="btn" data-act="import">Importar</button>
       <input id="import-file" type="file" accept="application/json" hidden>
     </div>
-    <p class="hint">Tus notas viven en este celular o computador. Exporta el archivo para pasarlas a otro dispositivo.</p>
+    <p class="hint">La bitácora se guarda en este aparato y en Firebase. Exporta el archivo si quieres un respaldo extra.</p>
   </section>`;
 }
 
@@ -767,9 +781,11 @@ document.addEventListener("click", (e) => {
   if (act.dataset.act === "import") document.getElementById("import-file").click();
   if (act.dataset.act === "logout") {
     localStorage.removeItem(AUTH_KEY);
+    cloudLogout();
     location.hash = "#/";
     renderLogin();
   }
+  if (act.dataset.act === "cloud-sync") cloudSyncNow();
   if (act.dataset.act === "gcal-connect") gcalConnect();
   if (act.dataset.act === "gcal-disconnect") gcalDisconnect();
   if (act.dataset.act === "gcal-save-client") {
@@ -824,11 +840,18 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = form.email.value.trim().toLowerCase();
   const pass = form.password.value;
+  const btn = form.querySelector("button[type=submit]");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Entrando...";
+  }
   const hash = await sha256Hex(`op-planner-2027|${email}|${pass}`);
   if (email === AUTH_EMAIL && hash === AUTH_HASH) {
     localStorage.setItem(AUTH_KEY, AUTH_HASH);
+    const cloudOk = await cloudLogin(email, pass);
+    if (cloudOk) await cloudPull();
     location.hash = "#/hoy";
-    toast("Listo");
+    toast(cloudOk ? "Listo. Nube conectada" : "Entraste. La nube se conecta al repetir el acceso");
     route();
     return;
   }
@@ -837,6 +860,7 @@ document.addEventListener("submit", async (e) => {
 
 window.addEventListener("hashchange", route);
 document.addEventListener("DOMContentLoaded", () => {
+  cloudInit();
   gcalInit();
   route();
 });

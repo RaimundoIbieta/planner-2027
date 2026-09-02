@@ -26,18 +26,13 @@ No uses tu correo en ese recuadro. Google pide una **llave de permiso** (un text
    - `https://raimundoibieta.github.io`
 4. Copia esa llave, pégala en **Perfil** → Guardar llave → **Conectar Google** (ahí sí entra con tu Gmail).
 
-## Base de datos (cuando sincronices iPhone y Chrome)
+## Nube (Firebase)
 
-GitHub Pages no trae servidor. **No uses Supabase** si ya llegaste al tope de proyectos.
+El planner ya está conectado al proyecto `planner-2027`. Faltan 3 clics en tu consola, si no los hiciste:
 
-Crea una cuenta **gratis** en Firebase (plan Spark), con el mismo Gmail:
+1. [Authentication](https://console.firebase.google.com/project/planner-2027/authentication/providers) → **Correo/contraseña** → Activar.
+2. [Firestore](https://console.firebase.google.com/project/planner-2027/firestore) → Crear base de datos (modo de prueba está bien al inicio).
+3. Firestore → **Reglas** → pega el contenido de `firestore.rules` → Publicar.
+4. Authentication → **Settings** → **Authorized domains** → agrega `raimundoibieta.github.io` (y `127.0.0.1` si pruebas en local).
 
-**https://console.firebase.google.com**
-
-1. **Add project** → nombre `planner-2027`
-2. **Authentication** → Email/Password → Enable
-3. **Firestore Database** → Create (modo de prueba)
-4. Ícono de engrane → **Project settings** → tus apps → **Web** (`</>`) → copia el `firebaseConfig`
-5. Pásame ese bloque y conecto login + bitácora
-
-Plan Spark es gratis para un planner personal. No hace falta tarjeta.
+Después: **Salir** en el planner y entra otra vez. En Perfil debe decir **Nube conectada**. Lo que escribas en el iPhone aparece en Chrome al recargar, y al revés.
