@@ -267,6 +267,23 @@ function officialArt(month) {
   return `assets/cal-${pad(month)}.jpg`;
 }
 
+function monthHead(month, hrefBase = "mes", title = "") {
+  const saga = SAGAS[month - 1];
+  const prev = month === 1 ? 12 : month - 1;
+  const next = month === 12 ? 1 : month + 1;
+  return `<header class="month-head">
+    <img src="${officialArt(month)}" alt="${esc(saga.title)}">
+    <div class="month-head-copy">
+      <p class="kicker">${esc(saga.arc)}</p>
+      <div class="day-nav tight">
+        <a class="nav-arrow" href="#/${hrefBase}/${prev}" aria-label="Anterior">‹</a>
+        <h1>${title || MONTHS[month - 1]}</h1>
+        <a class="nav-arrow" href="#/${hrefBase}/${next}" aria-label="Siguiente">›</a>
+      </div>
+    </div>
+  </header>`;
+}
+
 function heroFrame(src, alt = "") {
   return `<figure class="hero-frame"><img src="${src}" alt="${esc(alt)}"></figure>`;
 }
@@ -372,7 +389,7 @@ function fullCalendar(month, selected) {
         "</tr>"
     );
   }
-  return `<div class="box" style="padding:0;background:url('assets/wm-${pad(month)}.jpg') center/contain no-repeat #fff;"><table class="cal"><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+  return `<div class="cal-wrap" style="background-image:url('assets/wm-${pad(month)}.jpg')"><table class="cal"><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 }
 
 function renderDay(date) {
@@ -427,7 +444,7 @@ function renderDay(date) {
         <span>${MONTHS[month - 1]} · ${esc(saga.arc)} · ${esc(monthChar(month).name)}</span>
       </span>
     </a>
-    <div class="box">
+    <div class="box compact">
       <h3>¿Cómo vas hoy?</h3>
       ${moodBar(month, `days.${iso(day)}.mood`)}
     </div>
@@ -447,23 +464,13 @@ function renderDay(date) {
 function renderMonth(month) {
   M(month);
   const saga = SAGAS[month - 1];
-  const prev = month === 1 ? 12 : month - 1;
-  const next = month === 12 ? 1 : month + 1;
   ui.month = month;
   ui.quarter = Math.ceil(month / 3);
   return `<section class="sheet">
     ${monthTabs(month, "plan")}
-    <div class="day-nav">
-      <a class="nav-arrow" href="#/mes/${prev}">‹</a>
-      <h1>
-        <span class="dow-line">${esc(saga.arc)}</span>
-        ${MONTHS[month - 1]}
-      </h1>
-      <a class="nav-arrow" href="#/mes/${next}">›</a>
-    </div>
-    ${heroFrame(officialArt(month), saga.title)}
+    ${monthHead(month)}
     ${fullCalendar(month)}
-    <p class="hint" style="margin:8px 0 12px">Toca un día para escribir o agregar un evento. El punto dorado marca notas; las tiras son eventos.</p>
+    <p class="hint" style="margin:8px 0 12px">Toca un día para escribir o agregar un evento.</p>
     <details class="lore">
       <summary>Historia del mes</summary>
       <h2 style="margin-top:10px">${esc(saga.title)}</h2>
@@ -491,9 +498,7 @@ function renderMonthClose(month) {
   ui.quarter = q;
   return `<section class="sheet">
     ${monthTabs(month, "cierre")}
-    ${heroFrame(officialArt(month), saga.title)}
-    <p class="kicker">${esc(saga.arc)}</p>
-    <h1 class="page-title">Cierre de ${MONTHS[month - 1]}</h1>
+    ${monthHead(month, "cierre", "Cierre de " + MONTHS[month - 1])}
     <p class="q-blurb">${esc(saga.title)}</p>
     <div class="box char-of-month">
       <div class="char-head">
