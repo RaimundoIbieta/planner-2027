@@ -2,9 +2,12 @@ let cloudReady = false;
 let cloudTimer = 0;
 let skipCloudPush = false;
 let lastCloudError = "";
+let cloudDirty = false;
+let cloudUnsub = null;
+let cloudHydrated = false;
 
 function cloudEnabled() {
-  return Boolean(window.firebase?.apps && firebaseConfig?.projectId);
+  return Boolean(window.firebase && firebaseConfig?.projectId);
 }
 
 function cloudUser() {
@@ -25,11 +28,70 @@ function cloudInit() {
   if (!cloudEnabled()) return;
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   cloudReady = true;
-  firebase.auth().onAuthStateChanged(async (user) => {
+  firebase.auth().onAuthStateChanged((user) => {
+    if (cloudUnsub) {
+      cloudUnsub();
+      cloudUnsub = null;
+    }
+    cloudHydrated = false;
     if (!user || !isAuthed()) return;
-    const changed = await cloudPull();
-    if (changed) route();
+    cloudListen();
   });
+}
+
+function cloudListen() {
+  const ref = cloudDoc();
+  if (!ref) return;
+  cloudUnsub = ref.onSnapshot(
+    (snap) => {
+      if (skipCloudPush) return;
+      if (!snap.exists) {
+        cloudHydrated = true;
+        if (cloudDirty || richness(state) > 0) cloudFlush();
+        return;
+      }
+      const remote = snap.data() || {};
+      const cloudAt = Number(remote.updatedAt || 0);
+      const localAt = Number(state.updatedAt || 0);
+      if (cloudDirty && localAt > cloudAt) return;
+      if (remote.data && (cloudAt > localAt || (!localAt && !cloudHydrated))) {
+        if (cloudAt > localAt && richness(remote.data) < 8 && richness(state) > 8) {
+          cloudDirty = true;
+          state.updatedAt = Date.now();
+          cloudFlush();
+          cloudHydrated = true;
+          return;
+        }
+        applyRemote(remote);
+      }
+      cloudHydrated = true;
+    },
+    (err) => {
+      lastCloudError = err?.message || "No se pudo escuchar Firestore.";
+      console.warn(err);
+    }
+  );
+}
+
+function applyRemote(remote) {
+  const typing =
+    document.activeElement &&
+    /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  skipCloudPush = true;
+  cloudDirty = false;
+  state = { ...defaultState(), ...remote.data, updatedAt: Number(remote.updatedAt || 0) };
+  if (state.personal?.gcalClientId) gcalSaveClient(state.personal.gcalClientId);
+  localStorage.setItem(KEY, JSON.stringify(state));
+  skipCloudPush = false;
+  lastCloudError = "";
+  if (!typing && isAuthed()) route();
+}
+
+function richness(s) {
+  const p = s?.personal || {};
+  const days = Object.values(s?.days || {});
+  const events = Object.values(s?.events || {}).flat();
+  return [p.nombre, p.sueno, p.telefono, p.emergencia, ...days.map((d) => (d && d.log) || d || ""), ...events.map((e) => e.title || "")].join("").length;
 }
 
 async function cloudLogin(email, password) {
@@ -74,6 +136,10 @@ async function cloudLogin(email, password) {
 
 async function cloudLogout() {
   try {
+    if (cloudUnsub) {
+      cloudUnsub();
+      cloudUnsub = null;
+    }
     if (cloudEnabled()) await firebase.auth().signOut();
   } catch (err) {
     console.warn(err);
@@ -97,21 +163,35 @@ function cloudPayload() {
 }
 
 function cloudSchedulePush() {
-  if (skipCloudPush || !cloudUser()) return;
+  if (skipCloudPush || !cloudUser() || !cloudDirty) return;
   clearTimeout(cloudTimer);
   cloudTimer = setTimeout(() => {
     cloudPush().catch((err) => console.warn(err));
-  }, 800);
+  }, 400);
+}
+
+async function cloudFlush() {
+  clearTimeout(cloudTimer);
+  if (!cloudDirty) return false;
+  return cloudPush();
 }
 
 async function cloudPush() {
   const ref = cloudDoc();
   if (!ref) return false;
-  state.updatedAt = Date.now();
-  localStorage.setItem(KEY, JSON.stringify(state));
-  await ref.set(cloudPayload());
-  lastCloudError = "";
-  return true;
+  skipCloudPush = true;
+  try {
+    await ref.set(cloudPayload());
+    cloudDirty = false;
+    lastCloudError = "";
+    return true;
+  } catch (err) {
+    lastCloudError = err?.message || "No se pudo guardar en la nube.";
+    console.warn(err);
+    return false;
+  } finally {
+    skipCloudPush = false;
+  }
 }
 
 async function cloudPull() {
@@ -119,23 +199,19 @@ async function cloudPull() {
   if (!ref) return false;
   try {
     const snap = await ref.get();
-    const localAt = Number(state.updatedAt || 0);
     if (!snap.exists) {
-      if (localAt || JSON.stringify(state) !== JSON.stringify(defaultState())) {
-        await cloudPush();
-      }
+      cloudHydrated = true;
       return false;
     }
     const remote = snap.data() || {};
     const cloudAt = Number(remote.updatedAt || 0);
-    if (cloudAt > localAt && remote.data) {
-      skipCloudPush = true;
-      state = { ...defaultState(), ...remote.data, updatedAt: cloudAt };
-      localStorage.setItem(KEY, JSON.stringify(state));
-      skipCloudPush = false;
+    const localAt = Number(state.updatedAt || 0);
+    if (remote.data && cloudAt >= localAt) {
+      applyRemote(remote);
+      cloudHydrated = true;
       return true;
     }
-    if (localAt > cloudAt) await cloudPush();
+    cloudHydrated = true;
     return false;
   } catch (err) {
     lastCloudError = err?.message || "No se pudo leer Firestore.";
@@ -150,7 +226,7 @@ async function cloudSyncNow() {
     return;
   }
   const changed = await cloudPull();
-  await cloudPush();
+  if (cloudDirty) await cloudFlush();
   if (changed) route();
-  toast("Bitácora sincronizada");
+  toast(cloudUser() ? "Bitácora sincronizada" : "Sin conexión a la nube");
 }

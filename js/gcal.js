@@ -1,12 +1,15 @@
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GCAL_TOKEN_KEY = "op-planner-gcal-token";
+const GCAL_EXPIRES_KEY = "op-planner-gcal-expires";
 const GCAL_CLIENT_KEY = "op-planner-gcal-client";
 
 let gcalTokenClient = null;
+let gcalWaiters = [];
 
 function gcalClientId() {
   const fromFile = typeof GOOGLE_CLIENT_ID === "string" ? GOOGLE_CLIENT_ID.trim() : "";
-  return (localStorage.getItem(GCAL_CLIENT_KEY) || fromFile || "").trim();
+  const fromCloud = state?.personal?.gcalClientId || "";
+  return (localStorage.getItem(GCAL_CLIENT_KEY) || fromCloud || fromFile || "").trim();
 }
 
 function gcalEnabled() {
@@ -14,11 +17,13 @@ function gcalEnabled() {
 }
 
 function gcalConnected() {
-  return Boolean(sessionStorage.getItem(GCAL_TOKEN_KEY));
+  const token = gcalToken();
+  const exp = Number(localStorage.getItem(GCAL_EXPIRES_KEY) || 0);
+  return Boolean(token && exp > Date.now() + 15000);
 }
 
 function gcalToken() {
-  return sessionStorage.getItem(GCAL_TOKEN_KEY);
+  return localStorage.getItem(GCAL_TOKEN_KEY);
 }
 
 function gcalSaveClient(id) {
@@ -26,6 +31,12 @@ function gcalSaveClient(id) {
   if (value) localStorage.setItem(GCAL_CLIENT_KEY, value);
   else localStorage.removeItem(GCAL_CLIENT_KEY);
   gcalTokenClient = null;
+}
+
+function gcalStoreToken(accessToken, expiresIn) {
+  localStorage.setItem(GCAL_TOKEN_KEY, accessToken);
+  const ms = Math.max(30, Number(expiresIn) || 3600) * 1000;
+  localStorage.setItem(GCAL_EXPIRES_KEY, String(Date.now() + ms));
 }
 
 function gcalInit() {
@@ -36,26 +47,46 @@ function gcalInit() {
     callback: (resp) => {
       if (resp.error) {
         toast("No se pudo conectar Google Calendar");
+        gcalWaiters.splice(0).forEach((w) => w(false));
         return;
       }
-      sessionStorage.setItem(GCAL_TOKEN_KEY, resp.access_token);
+      gcalStoreToken(resp.access_token, resp.expires_in);
       toast("Google Calendar conectado");
-      route();
+      gcalWaiters.splice(0).forEach((w) => w(true));
+      if (isAuthed()) route();
     }
   });
 }
 
 function gcalConnect() {
-  if (!gcalEnabled()) {
-    toast("Falta la llave de Google. Mira Perfil.");
-    return;
-  }
-  if (!window.google?.accounts?.oauth2) {
-    toast("Google aún no carga. Recarga la página.");
-    return;
-  }
-  gcalInit();
-  gcalTokenClient?.requestAccessToken({ prompt: gcalConnected() ? "" : "consent" });
+  return gcalEnsure(true);
+}
+
+function gcalEnsure(forcePrompt = false) {
+  return new Promise((resolve) => {
+    if (gcalConnected() && !forcePrompt) {
+      resolve(true);
+      return;
+    }
+    if (!gcalEnabled()) {
+      resolve(false);
+      return;
+    }
+    if (!window.google?.accounts?.oauth2) {
+      toast("Google aún no carga. Recarga la página.");
+      resolve(false);
+      return;
+    }
+    gcalInit();
+    if (!gcalTokenClient) {
+      resolve(false);
+      return;
+    }
+    gcalWaiters.push(resolve);
+    gcalTokenClient.requestAccessToken({
+      prompt: forcePrompt || !gcalToken() ? "consent" : ""
+    });
+  });
 }
 
 function gcalDisconnect() {
@@ -63,7 +94,8 @@ function gcalDisconnect() {
   if (token && window.google?.accounts?.oauth2) {
     google.accounts.oauth2.revoke(token, () => {});
   }
-  sessionStorage.removeItem(GCAL_TOKEN_KEY);
+  localStorage.removeItem(GCAL_TOKEN_KEY);
+  localStorage.removeItem(GCAL_EXPIRES_KEY);
   toast("Google Calendar desconectado");
   route();
 }
@@ -80,7 +112,8 @@ async function gcalFetch(path, options = {}) {
     }
   });
   if (res.status === 401) {
-    sessionStorage.removeItem(GCAL_TOKEN_KEY);
+    localStorage.removeItem(GCAL_TOKEN_KEY);
+    localStorage.removeItem(GCAL_EXPIRES_KEY);
     throw new Error("expired");
   }
   if (!res.ok) throw new Error(await res.text());
@@ -89,8 +122,12 @@ async function gcalFetch(path, options = {}) {
 }
 
 function toGcalEvent(local, dateIso) {
-  const start = local.start || "09:00";
-  const end = local.end || local.start || "10:00";
+  let start = local.start || "09:00";
+  let end = local.end || "";
+  if (!end || end <= start) {
+    const [h, m] = start.split(":").map(Number);
+    end = `${String((h + 1) % 24).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+  }
   return {
     summary: local.title,
     description: "Planner 2027",
@@ -99,8 +136,9 @@ function toGcalEvent(local, dateIso) {
   };
 }
 
-async function gcalPush(local, dateIso) {
-  if (!gcalConnected()) return local;
+async function gcalPush(local, dateIso, retried = false) {
+  const ready = await gcalEnsure(false);
+  if (!ready) return local;
   try {
     if (local.gcalId) {
       await gcalFetch(`/calendars/primary/events/${encodeURIComponent(local.gcalId)}`, {
@@ -116,14 +154,20 @@ async function gcalPush(local, dateIso) {
     local.gcalId = created.id;
     return local;
   } catch (err) {
+    if (!retried && String(err.message) === "expired") {
+      const ok = await gcalEnsure(true);
+      if (ok) return gcalPush(local, dateIso, true);
+    }
     console.warn(err);
-    toast("Guardado aquí. Google no respondió.");
+    toast("En el planner sí. Google no alcanzó a guardar.");
     return local;
   }
 }
 
 async function gcalRemove(gcalId) {
-  if (!gcalConnected() || !gcalId) return;
+  if (!gcalId) return;
+  const ready = await gcalEnsure(false);
+  if (!ready) return;
   try {
     await gcalFetch(`/calendars/primary/events/${encodeURIComponent(gcalId)}`, { method: "DELETE" });
   } catch (err) {
@@ -132,7 +176,8 @@ async function gcalRemove(gcalId) {
 }
 
 async function gcalPullMonth(year, month) {
-  if (!gcalConnected()) return false;
+  const ready = await gcalEnsure(false);
+  if (!ready) return false;
   const start = new Date(year, month - 1, 1).toISOString();
   const end = new Date(year, month, 1).toISOString();
   try {
@@ -155,7 +200,7 @@ async function gcalPullMonth(year, month) {
       });
       added += 1;
     }
-    if (added) persist();
+    if (added) persist(true);
     return added > 0;
   } catch (err) {
     console.warn(err);

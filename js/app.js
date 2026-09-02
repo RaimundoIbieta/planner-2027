@@ -83,10 +83,18 @@ function loadState() {
   }
 }
 
-function persist() {
-  if (!skipCloudPush) state.updatedAt = Date.now();
+function persist(fromUser = false) {
+  if (fromUser) {
+    cloudDirty = true;
+    state.updatedAt = Date.now();
+  }
   localStorage.setItem(KEY, JSON.stringify(state));
-  cloudSchedulePush();
+  if (fromUser) cloudSchedulePush();
+}
+
+function flushLocal() {
+  localStorage.setItem(KEY, JSON.stringify(state));
+  cloudFlush();
 }
 
 function scheduleSave() {
@@ -107,7 +115,7 @@ function setPath(path, value) {
     cur = cur[k];
   }
   cur[keys[keys.length - 1]] = value;
-  scheduleSave();
+  persist(true);
 }
 
 function personal() {
@@ -749,7 +757,7 @@ function onStoreInput(e) {
 }
 
 function exportState() {
-  persist();
+  flushLocal();
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -764,7 +772,7 @@ function importState(file) {
   reader.onload = () => {
     try {
       state = { ...defaultState(), ...JSON.parse(reader.result) };
-      persist();
+      persist(true);
       route();
       toast("Bitácora importada");
     } catch {
@@ -795,7 +803,11 @@ document.addEventListener("click", (e) => {
   if (act.dataset.act === "gcal-disconnect") gcalDisconnect();
   if (act.dataset.act === "gcal-save-client") {
     const input = document.getElementById("gcal-client");
-    gcalSaveClient(input?.value || "");
+    const value = input?.value || "";
+    gcalSaveClient(value);
+    state.personal ||= {};
+    state.personal.gcalClientId = value.trim();
+    persist(true);
     toast(gcalEnabled() ? "Llave guardada" : "Llave borrada");
     route();
   }
@@ -805,7 +817,7 @@ document.addEventListener("click", (e) => {
     const list = eventsOn(parseISO(dayIso));
     const found = list.find((e) => e.id === id);
     state.events[dayIso] = list.filter((e) => e.id !== id);
-    persist();
+    persist(true);
     if (found?.gcalId) gcalRemove(found.gcalId);
     route();
     toast("Evento borrado");
@@ -835,9 +847,10 @@ document.addEventListener("submit", async (e) => {
     };
     ev = await gcalPush(ev, dayIso);
     list.push(ev);
-    persist();
+    persist(true);
+    await cloudFlush();
     route();
-    toast(gcalConnected() ? "Evento en ambos calendarios" : "Evento guardado");
+    toast(ev.gcalId ? "Evento en el planner y en Google Calendar" : "Evento en el planner. Conecta Google en Perfil para copiarlo al Calendar.");
     return;
   }
   const form = e.target.closest("#login-form");
@@ -871,6 +884,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 window.addEventListener("load", gcalInit);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") persist();
+  if (document.visibilityState === "hidden") flushLocal();
 });
-window.addEventListener("pagehide", persist);
+window.addEventListener("pagehide", flushLocal);
