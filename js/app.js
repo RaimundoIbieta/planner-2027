@@ -279,7 +279,7 @@ function eventList(date) {
     ? gcalConnected()
       ? `<p class="hint">Este evento también se crea en tu Google Calendar.</p>`
       : `<button class="btn" type="button" data-act="gcal-connect">Conectar Google Calendar</button>`
-    : `<p class="hint">Para sincronizar con Google, pega el ID de cliente en Perfil.</p>`;
+    : `<p class="hint">Para copiar los eventos a Google Calendar, abre <a href="#/yo">Perfil</a> y sigue los 4 pasos. No es tu correo: es una llave que te da Google una sola vez.</p>`;
   return `<div class="box" style="margin-top:10px">
     <h3>Eventos</h3>
     <ul class="event-list">${items || `<li class="hint">Todavía no hay eventos este día.</li>`}</ul>
@@ -622,20 +622,22 @@ function renderProfile() {
     </div>
     <div class="box" style="margin-top:10px">
       <h3>Google Calendar</h3>
-      <p class="hint">Para que un evento exista aquí y en Google, conecta tu cuenta. Crea un ID de cliente OAuth (aplicación web) en Google Cloud, con estos orígenes autorizados:</p>
-      <ul class="hint-list">
-        <li>http://127.0.0.1:4173</li>
-        <li>https://raimundoibieta.github.io</li>
-      </ul>
-      <label class="field-label" for="gcal-client">ID de cliente</label>
-      <input class="field" id="gcal-client" value="${esc(gcalClientId())}" placeholder="xxxxx.apps.googleusercontent.com">
+      <p class="hint">Esto no es tu Gmail ni tu contraseña. Google pide una llave para que esta página pueda crear eventos en tu calendario. Se hace una sola vez.</p>
+      <ol class="hint-list">
+        <li>Abre <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">este enlace</a> y pulsa <strong>Habilitar</strong> (o Enable).</li>
+        <li>Luego abre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credenciales</a> → <strong>Crear credenciales</strong> → <strong>ID de cliente de OAuth</strong> → tipo <strong>Aplicación web</strong>.</li>
+        <li>En “Orígenes de JavaScript autorizados” agrega estas dos líneas, tal cual:<br><code>http://127.0.0.1:4173</code><br><code>https://raimundoibieta.github.io</code></li>
+        <li>Crea y copia el texto largo que termina en <code>.apps.googleusercontent.com</code>. Eso es la llave. Pégala abajo y pulsa <strong>Guardar llave</strong>. Después pulsa <strong>Conectar Google</strong> y entra con tu Gmail.</li>
+      </ol>
+      <label class="field-label" for="gcal-client">Llave de Google (no es tu correo)</label>
+      <input class="field" id="gcal-client" value="${esc(gcalClientId())}" placeholder="123456789-abc.apps.googleusercontent.com" autocomplete="off">
       <div class="actions" style="margin-top:10px">
-        <button class="btn" type="button" data-act="gcal-save-client">Guardar ID</button>
+        <button class="btn" type="button" data-act="gcal-save-client">Guardar llave</button>
         ${gcalConnected()
           ? `<button class="btn" type="button" data-act="gcal-disconnect">Desconectar</button>`
           : `<button class="btn primary" type="button" data-act="gcal-connect">Conectar Google</button>`}
       </div>
-      <p class="hint">${gcalConnected() ? "Conectado. Los eventos nuevos salen en ambos calendarios." : "Todavía no está conectado."}</p>
+      <p class="hint">${gcalConnected() ? "Listo. Un evento que agregues aquí también aparece en Google Calendar." : "Todavía no está conectado. Mientras tanto, los eventos se guardan solo en el planner."}</p>
     </div>
     <div class="actions">
       <button class="btn" data-act="export">Exportar bitácora</button>
@@ -769,7 +771,7 @@ document.addEventListener("click", (e) => {
   if (act.dataset.act === "gcal-save-client") {
     const input = document.getElementById("gcal-client");
     gcalSaveClient(input?.value || "");
-    toast(gcalEnabled() ? "ID guardado" : "ID borrado");
+    toast(gcalEnabled() ? "Llave guardada" : "Llave borrada");
     route();
   }
   if (act.dataset.act === "del-event") {

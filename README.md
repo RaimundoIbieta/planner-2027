@@ -17,14 +17,14 @@ En el iPhone: Safari → Compartir → Añadir a pantalla de inicio.
 
 ## Google Calendar
 
-Para que un evento exista en el planner y en Google:
+No uses tu correo en ese recuadro. Google pide una **llave de permiso** (un texto largo que termina en `.apps.googleusercontent.com`) para que esta página pueda crear eventos en tu calendario.
 
-1. En [Google Cloud](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com) activa **Google Calendar API**.
-2. [Credenciales](https://console.cloud.google.com/apis/credentials) → Crear credenciales → **ID de cliente de OAuth** → tipo **Aplicación web**.
+1. [Activa Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com).
+2. [Credenciales](https://console.cloud.google.com/apis/credentials) → Crear credenciales → ID de cliente de OAuth → **Aplicación web**.
 3. Orígenes de JavaScript autorizados:
    - `http://127.0.0.1:4173`
    - `https://raimundoibieta.github.io`
-4. Copia el ID (termina en `.apps.googleusercontent.com`), pégalo en **Perfil** y toca **Conectar Google**.
+4. Copia esa llave, pégala en **Perfil** → Guardar llave → **Conectar Google** (ahí sí entra con tu Gmail).
 
 ## Base de datos (cuando sincronices iPhone y Chrome)
 

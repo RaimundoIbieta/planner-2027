@@ -47,7 +47,7 @@ function gcalInit() {
 
 function gcalConnect() {
   if (!gcalEnabled()) {
-    toast("Pega el ID de cliente en Perfil");
+    toast("Falta la llave de Google. Mira Perfil.");
     return;
   }
   if (!window.google?.accounts?.oauth2) {
