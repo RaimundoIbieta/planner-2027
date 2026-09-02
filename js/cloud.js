@@ -37,6 +37,9 @@ function cloudInit() {
     if (!user || !isAuthed()) return;
     cloudListen();
   });
+  window.addEventListener("online", () => {
+    cloudFlush();
+  });
 }
 
 function cloudListen() {
@@ -167,7 +170,7 @@ function cloudSchedulePush() {
   clearTimeout(cloudTimer);
   cloudTimer = setTimeout(() => {
     cloudPush().catch((err) => console.warn(err));
-  }, 400);
+  }, 180);
 }
 
 async function cloudFlush() {
@@ -218,15 +221,4 @@ async function cloudPull() {
     console.warn(err);
     return false;
   }
-}
-
-async function cloudSyncNow() {
-  if (!cloudUser()) {
-    toast("Pulsa Salir y entra otra vez para conectar la nube.");
-    return;
-  }
-  const changed = await cloudPull();
-  if (cloudDirty) await cloudFlush();
-  if (changed) route();
-  toast(cloudUser() ? "Bitácora sincronizada" : "Sin conexión a la nube");
 }

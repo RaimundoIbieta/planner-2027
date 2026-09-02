@@ -640,16 +640,13 @@ function renderProfile() {
       ${field("personal.emergencia", "Nombre y teléfono", false)}
     </div>
     <div class="box" style="margin-top:10px">
-      <h3>Nube (iPhone y Chrome)</h3>
+      <h3>Nube</h3>
       <p class="hint">${
         cloudStatus() === "ok"
-          ? "Conectada. Lo que escribas aquí aparece en tus otros dispositivos al recargar."
-          : "Todavía no está conectada. Pulsa Salir, entra otra vez con tu clave y se crea sola."
+          ? "Todo lo que escribas se guarda solo. Si entras en el iPhone, en el Mac o en otro computador, verás lo mismo."
+          : "Aún no está enlazada. Pulsa Salir y entra otra vez con tu clave; después queda automática."
       }</p>
       ${lastCloudError ? `<p class="login-error">${esc(lastCloudError)}</p>` : ""}
-      <div class="actions" style="margin-top:10px">
-        <button class="btn" type="button" data-act="cloud-sync">Sincronizar ahora</button>
-      </div>
     </div>
     <div class="box" style="margin-top:10px">
       <h3>Google Calendar</h3>
@@ -675,7 +672,7 @@ function renderProfile() {
       <button class="btn" data-act="import">Importar</button>
       <input id="import-file" type="file" accept="application/json" hidden>
     </div>
-    <p class="hint">La bitácora se guarda en este aparato y en Firebase. Exporta el archivo si quieres un respaldo extra.</p>
+    <p class="hint">La bitácora se guarda sola en la nube. Exportar es solo un respaldo extra.</p>
   </section>`;
 }
 
@@ -798,7 +795,6 @@ document.addEventListener("click", (e) => {
     location.hash = "#/";
     renderLogin();
   }
-  if (act.dataset.act === "cloud-sync") cloudSyncNow();
   if (act.dataset.act === "gcal-connect") gcalConnect();
   if (act.dataset.act === "gcal-disconnect") gcalDisconnect();
   if (act.dataset.act === "gcal-save-client") {
@@ -830,6 +826,9 @@ document.addEventListener("change", (e) => {
 });
 
 document.addEventListener("input", onStoreInput);
+document.addEventListener("blur", (e) => {
+  if (e.target.closest("[data-store]")) cloudFlush();
+}, true);
 
 document.addEventListener("submit", async (e) => {
   const eventForm = e.target.closest("#event-form");
@@ -869,7 +868,7 @@ document.addEventListener("submit", async (e) => {
     const cloudOk = await cloudLogin(email, pass);
     if (cloudOk) await cloudPull();
     location.hash = "#/hoy";
-    toast(cloudOk ? "Listo. Nube conectada" : "Entraste. La nube se conecta al repetir el acceso");
+    toast(cloudOk ? "Listo" : "Entraste. Si la nube no enlazó, entra otra vez.");
     route();
     return;
   }
