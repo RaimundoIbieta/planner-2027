@@ -344,6 +344,17 @@ async function sha256Hex(text) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function renderBoot() {
+  document.body.classList.add("locked");
+  document.getElementById("app").innerHTML = `<section class="login-screen">
+    <div class="login-card">
+      <p class="kicker">Bitácora del capitán</p>
+      <h1>Abriendo…</h1>
+      <p class="hint">Enlazando este aparato a la nube</p>
+    </div>
+  </section>`;
+}
+
 function renderLogin(error = "") {
   document.body.classList.add("locked");
   document.getElementById("app").innerHTML = `<section class="login-screen">
@@ -692,6 +703,14 @@ function route() {
     renderLogin();
     return;
   }
+  if (cloudEnabled() && !firebaseAuthReady) {
+    renderBoot();
+    return;
+  }
+  if (cloudEnabled() && !cloudUser()) {
+    renderLogin(lastCloudError || "Entra otra vez con tu clave para que este aparato use la misma bitácora.");
+    return;
+  }
   document.body.classList.remove("locked");
   const parts = parseHash();
   let html = "";
@@ -866,9 +885,13 @@ document.addEventListener("submit", async (e) => {
   if (email === AUTH_EMAIL && hash === AUTH_HASH) {
     localStorage.setItem(AUTH_KEY, AUTH_HASH);
     const cloudOk = await cloudLogin(email, pass);
-    if (cloudOk) await cloudPull();
+    if (!cloudOk) {
+      renderLogin(lastCloudError || "No se pudo enlazar la nube. Revisa el mensaje e inténtalo otra vez.");
+      return;
+    }
+    await cloudPull();
     location.hash = "#/hoy";
-    toast(cloudOk ? "Listo" : "Entraste. Si la nube no enlazó, entra otra vez.");
+    toast("Listo");
     route();
     return;
   }
