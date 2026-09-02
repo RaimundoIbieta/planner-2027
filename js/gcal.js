@@ -2,9 +2,12 @@ const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GCAL_TOKEN_KEY = "op-planner-gcal-token";
 const GCAL_EXPIRES_KEY = "op-planner-gcal-expires";
 const GCAL_CLIENT_KEY = "op-planner-gcal-client";
+const GCAL_GRANTED_KEY = "op-planner-gcal-granted";
 
 let gcalTokenClient = null;
 let gcalWaiters = [];
+let gcalWarmed = false;
+let gcalSilent = false;
 
 function gcalClientId() {
   const fromFile = typeof GOOGLE_CLIENT_ID === "string" ? GOOGLE_CLIENT_ID.trim() : "";
@@ -14,6 +17,10 @@ function gcalClientId() {
 
 function gcalEnabled() {
   return Boolean(gcalClientId());
+}
+
+function gcalLinked() {
+  return gcalEnabled() && localStorage.getItem(GCAL_GRANTED_KEY) === "1";
 }
 
 function gcalConnected() {
@@ -33,10 +40,24 @@ function gcalSaveClient(id) {
   gcalTokenClient = null;
 }
 
+function gcalRememberClient() {
+  const id = gcalClientId();
+  if (!id) return;
+  gcalSaveClient(id);
+  if (typeof skipCloudPush !== "undefined" && skipCloudPush) return;
+  state.personal ||= {};
+  if (state.personal.gcalClientId !== id) {
+    state.personal.gcalClientId = id;
+    persist(true);
+  }
+}
+
 function gcalStoreToken(accessToken, expiresIn) {
   localStorage.setItem(GCAL_TOKEN_KEY, accessToken);
   const ms = Math.max(30, Number(expiresIn) || 3600) * 1000;
   localStorage.setItem(GCAL_EXPIRES_KEY, String(Date.now() + ms));
+  localStorage.setItem(GCAL_GRANTED_KEY, "1");
+  gcalRememberClient();
 }
 
 function gcalInit() {
@@ -46,23 +67,32 @@ function gcalInit() {
     scope: GCAL_SCOPE,
     callback: (resp) => {
       if (resp.error) {
-        toast("No se pudo conectar Google Calendar");
+        if (!gcalSilent) toast("No se pudo conectar Google Calendar");
         gcalWaiters.splice(0).forEach((w) => w(false));
+        gcalSilent = false;
         return;
       }
       gcalStoreToken(resp.access_token, resp.expires_in);
-      toast("Google Calendar conectado");
+      if (!gcalSilent) toast("Google Calendar listo");
       gcalWaiters.splice(0).forEach((w) => w(true));
-      if (isAuthed()) route();
+      gcalSilent = false;
     }
   });
 }
 
 function gcalConnect() {
-  return gcalEnsure(true);
+  return gcalEnsure(false);
 }
 
-function gcalEnsure(forcePrompt = false) {
+function gcalWarmup() {
+  if (gcalWarmed || !gcalEnabled() || !isAuthed()) return;
+  gcalWarmed = true;
+  gcalRememberClient();
+  if (gcalConnected()) return;
+  gcalEnsure(false, true);
+}
+
+function gcalEnsure(forcePrompt = false, silent = false) {
   return new Promise((resolve) => {
     if (gcalConnected() && !forcePrompt) {
       resolve(true);
@@ -73,18 +103,29 @@ function gcalEnsure(forcePrompt = false) {
       return;
     }
     if (!window.google?.accounts?.oauth2) {
-      toast("Google aún no carga. Recarga la página.");
+      if (!silent) toast("Google aún no carga. Recarga la página.");
       resolve(false);
       return;
     }
+    gcalSilent = silent;
     gcalInit();
     if (!gcalTokenClient) {
       resolve(false);
       return;
     }
     gcalWaiters.push(resolve);
+    if (silent) {
+      setTimeout(() => {
+        const idx = gcalWaiters.indexOf(resolve);
+        if (idx >= 0) {
+          gcalWaiters.splice(idx, 1);
+          resolve(gcalConnected());
+        }
+      }, 6000);
+    }
+    const granted = localStorage.getItem(GCAL_GRANTED_KEY) === "1";
     gcalTokenClient.requestAccessToken({
-      prompt: forcePrompt || !gcalToken() ? "consent" : ""
+      prompt: forcePrompt || !granted ? "consent" : ""
     });
   });
 }
@@ -155,7 +196,7 @@ async function gcalPush(local, dateIso, retried = false) {
     return local;
   } catch (err) {
     if (!retried && String(err.message) === "expired") {
-      const ok = await gcalEnsure(true);
+      if (ok) return gcalPush(local, dateIso, true);
       if (ok) return gcalPush(local, dateIso, true);
     }
     console.warn(err);
