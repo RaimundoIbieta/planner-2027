@@ -1,0 +1,5 @@
+.venv/
+ref/
+.DS_Store
+*.pdf
+__pycache__/
