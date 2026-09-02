@@ -9,6 +9,7 @@ const DOW_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const AUTH_KEY = "op-planner-2027-auth";
 
 const ui = { month: 1, week: 1, quarter: 1 };
+const gcalPulled = new Set();
 let state = loadState();
 let saveTimer = 0;
 
@@ -69,7 +70,7 @@ function monthGrid(month) {
 }
 
 function defaultState() {
-  return { personal: {}, quarters: {}, months: {}, weeks: {}, days: {} };
+  return { personal: {}, quarters: {}, months: {}, weeks: {}, days: {}, events: {} };
 }
 
 function loadState() {
@@ -147,9 +148,27 @@ function M(n) {
     pendientes: "",
     gracias: "",
     nakama: "",
-    animo: ""
+    animo: "",
+    nota: ""
   };
+  if (state.months[n].nota == null) state.months[n].nota = "";
   return state.months[n];
+}
+
+function monthChar(month) {
+  return MONTH_CHAR[month - 1];
+}
+
+function charArt(id) {
+  const named = ["luffy", "zoro", "nami", "usopp", "sanji", "chopper", "robin", "franky", "brook", "jinbe", "ace", "sabo"];
+  return named.includes(id) ? `assets/jolly-${id}.jpg` : `assets/mood-${id}.jpg`;
+}
+
+function eventsOn(date) {
+  state.events ||= {};
+  const k = iso(date);
+  if (!Array.isArray(state.events[k])) state.events[k] = [];
+  return state.events[k];
 }
 
 function dayValue(date) {
@@ -162,6 +181,10 @@ function dayValue(date) {
 function dayHasNote(date) {
   const v = dayValue(date);
   return Boolean((v.plan + " " + v.log).trim());
+}
+
+function dayHasEvents(date) {
+  return eventsOn(date).length > 0;
 }
 
 function today() {
@@ -205,29 +228,71 @@ function field(path, placeholder = "", multiline = true) {
 }
 
 function jollyFor(month) {
-  return `assets/jolly-${MONTH_JOLLY[month - 1]}.jpg`;
+  return charArt(monthChar(month).id);
 }
 
-function moodPicker(path) {
+function moodBar(month, path) {
+  const ch = monthChar(month);
   const current = String(getPath(path) || "");
-  return `<div class="mood-row">${MOODS.map(
-    (m) => `<label class="mood ${current === m.id ? "on" : ""}">
-      <input type="radio" name="${path}" data-store="${path}" value="${m.id}" ${current === m.id ? "checked" : ""}>
-      <strong>${m.label}</strong>
-      <small>${m.desc}</small>
+  const hits = [1, 2, 3, 4, 5]
+    .map(
+      (n) => `<label class="mood-hit ${current === String(n) ? "on" : ""}">
+      <input type="radio" name="${path}" data-store="${path}" value="${n}" ${current === String(n) ? "checked" : ""}>
+      <span>${n}</span>
     </label>`
-  ).join("")}</div>`;
+    )
+    .join("");
+  return `<div class="mood-scale">
+    <img src="assets/mood-${ch.id}.jpg" alt="Escala de ánimo de ${esc(ch.name)}">
+    <div class="mood-hits">${hits}</div>
+  </div>
+  <p class="hint">${esc(ch.name)} · toca el recuadro del nivel 1 al 5</p>`;
 }
 
-function nakamaPicker(path) {
+function gradePicker(path) {
   const current = String(getPath(path) || "");
-  return `<div class="nakama-row">${NAKAMAS.map(
-    (n) => `<label class="nakama ${current === n.id ? "on" : ""}">
-      <input type="radio" name="${path}" data-store="${path}" value="${n.id}" ${current === n.id ? "checked" : ""}>
-      <img src="assets/jolly-${n.id}.jpg" alt="">
-      <span>${n.name}</span>
+  return `<div class="grade-row">${[1, 2, 3, 4, 5, 6, 7]
+    .map(
+      (n) => `<label class="grade ${current === String(n) ? "on" : ""}">
+      <input type="radio" name="${path}" data-store="${path}" value="${n}" ${current === String(n) ? "checked" : ""}>
+      ${n}
     </label>`
-  ).join("")}</div>`;
+    )
+    .join("")}</div>`;
+}
+
+function officialArt(month) {
+  return `assets/cal-${pad(month)}.jpg`;
+}
+
+function eventList(date) {
+  const dayIso = iso(date);
+  const items = eventsOn(date)
+    .map(
+      (e) => `<li class="event-row">
+      <span><strong>${esc(e.start || "Todo el día")}</strong> ${esc(e.title)}</span>
+      <button type="button" class="icon-btn" data-act="del-event" data-id="${esc(e.id)}" data-day="${dayIso}" aria-label="Borrar">✕</button>
+    </li>`
+    )
+    .join("");
+  const gcalHint = gcalEnabled()
+    ? gcalConnected()
+      ? `<p class="hint">Este evento también se crea en tu Google Calendar.</p>`
+      : `<button class="btn" type="button" data-act="gcal-connect">Conectar Google Calendar</button>`
+    : `<p class="hint">Para sincronizar con Google, pega el ID de cliente en Perfil.</p>`;
+  return `<div class="box" style="margin-top:10px">
+    <h3>Eventos</h3>
+    <ul class="event-list">${items || `<li class="hint">Todavía no hay eventos este día.</li>`}</ul>
+    <form id="event-form" data-day="${dayIso}">
+      <input name="title" placeholder="Título del evento" required>
+      <div class="event-times">
+        <label>Inicio <input name="start" type="time" value="09:00"></label>
+        <label>Fin <input name="end" type="time" value="10:00"></label>
+      </div>
+      <button class="btn primary" type="submit">Agregar evento</button>
+    </form>
+    ${gcalHint}
+  </div>`;
 }
 
 function monthTabs(month, tab) {
@@ -253,7 +318,7 @@ function renderLogin(error = "") {
   document.getElementById("app").innerHTML = `<section class="login-screen">
     <form class="login-card" id="login-form" autocomplete="on">
       <p class="kicker">Bitácora del capitán</p>
-      <img class="hero-logo" src="assets/cover.jpg" alt="One Piece">
+      <img class="hero-logo" src="assets/logo.jpg" alt="One Piece">
       <h1>Planner 2027</h1>
       <p class="hint">Acceso personal</p>
       <div class="login-fields">
@@ -281,15 +346,21 @@ function fullCalendar(month, selected) {
           .map((d, idx) => {
             if (!d) return `<td class="empty"></td>`;
             const date = new Date(YEAR, month - 1, d);
+            const evs = eventsOn(date);
             const cls = [
               idx === 6 ? "sun" : "",
               dayHasNote(date) ? "has" : "",
+              evs.length ? "busy" : "",
               sameDay(date, now) ? "today" : "",
               selected && sameDay(date, selected) ? "today" : ""
             ]
               .filter(Boolean)
               .join(" ");
-            return `<td class="${cls}" data-go="dia/${iso(date)}"><div class="num">${d}</div></td>`;
+            const chips = evs
+              .slice(0, 2)
+              .map((e) => `<div class="ev-chip">${esc(e.title)}</div>`)
+              .join("");
+            return `<td class="${cls}" data-go="dia/${iso(date)}"><div class="num">${d}</div>${chips}</td>`;
           })
           .join("") +
         "</tr>"
@@ -314,7 +385,7 @@ function renderDay(date) {
     .map((d, i) => {
       const active = sameDay(d, day) ? "active" : "";
       const sun = i === 6 ? "sun" : "";
-      const has = dayHasNote(d) ? "has" : "";
+      const has = dayHasNote(d) || dayHasEvents(d) ? "has" : "";
       return `<a class="${active} ${sun} ${has}" href="#/dia/${iso(d)}">
         <span class="d">${DOW_SHORT[i]}</span>
         <span class="n">${d.getDate()}</span>
@@ -344,20 +415,21 @@ function renderDay(date) {
     </div>
     <div class="week-strip">${strip}</div>
     <a class="saga-chip" href="#/mes/${month}">
-      <img src="assets/hero-${pad(month)}.jpg" alt="">
+      <img src="${officialArt(month)}" alt="">
       <span>
         <strong>${esc(saga.title)}</strong>
-        <span>${MONTHS[month - 1]} · ${esc(saga.arc)}</span>
+        <span>${MONTHS[month - 1]} · ${esc(saga.arc)} · ${esc(monthChar(month).name)}</span>
       </span>
     </a>
     <div class="box">
       <h3>¿Cómo vas hoy?</h3>
-      ${moodPicker(`days.${iso(day)}.mood`)}
+      ${moodBar(month, `days.${iso(day)}.mood`)}
     </div>
     <div class="box priority" style="margin-top:10px">
       <h3>Lo importante hoy</h3>
       ${field(`days.${iso(day)}.plan`, "1, 2 o 3 cosas. Nada más.", true)}
     </div>
+    ${eventList(day)}
     <div class="box grow big-note" style="margin-top:10px">
       <h3>Notas del día</h3>
       ${field(`days.${iso(day)}.log`, "Escribe aquí. Se guarda solo.", true)}
@@ -383,9 +455,9 @@ function renderMonth(month) {
       </h1>
       <a class="nav-arrow" href="#/mes/${next}">›</a>
     </div>
-    <img class="hero-banner" src="assets/hero-${pad(month)}.jpg" alt="${esc(saga.title)}">
+    <img class="hero-banner" src="${officialArt(month)}" alt="${esc(saga.title)}">
     ${fullCalendar(month)}
-    <p class="hint" style="margin:8px 0 12px">Toca un día para escribir. El punto dorado marca los que ya tienen notas.</p>
+    <p class="hint" style="margin:8px 0 12px">Toca un día para escribir o agregar un evento. El punto dorado marca notas; las tiras son eventos.</p>
     <details class="lore">
       <summary>Historia del mes</summary>
       <h2 style="margin-top:10px">${esc(saga.title)}</h2>
@@ -407,23 +479,30 @@ function renderMonth(month) {
 function renderMonthClose(month) {
   M(month);
   const saga = SAGAS[month - 1];
+  const ch = monthChar(month);
   const q = Math.ceil(month / 3);
   ui.month = month;
   ui.quarter = q;
   return `<section class="sheet">
     ${monthTabs(month, "cierre")}
-    <img class="hero-banner" src="assets/hero-${pad(month)}.jpg" alt="">
+    <img class="hero-banner" src="${officialArt(month)}" alt="">
     <p class="kicker">${esc(saga.arc)}</p>
     <h1 class="page-title">Cierre de ${MONTHS[month - 1]}</h1>
     <p class="q-blurb">${esc(saga.title)}</p>
-    <div class="box">
-      <h3>Nakama del mes</h3>
-      <p class="hint">¿Quién representó tu mes?</p>
-      ${nakamaPicker(`months.${month}.nakama`)}
+    <div class="box char-of-month">
+      <div class="char-head">
+        <img src="${jollyFor(month)}" alt="">
+        <div>
+          <h3>${esc(ch.name)}</h3>
+          <p class="hint" style="margin:0">${MONTHS[month - 1]} tiene a ${esc(ch.name)} como nakama fijo. Usa su escala de ánimo.</p>
+        </div>
+      </div>
+      ${moodBar(month, `months.${month}.animo`)}
     </div>
     <div class="box" style="margin-top:10px">
-      <h3>Ánimo del mes</h3>
-      ${moodPicker(`months.${month}.animo`)}
+      <h3>Nota del mes</h3>
+      <p class="hint">Del 1 al 7, ¿cómo fue ${MONTHS[month - 1]}?</p>
+      ${gradePicker(`months.${month}.nota`)}
     </div>
     <div class="box" style="margin-top:10px"><h3>Logros</h3>${field(`months.${month}.logros`, "¿Qué conquistaste?")}</div>
     <div class="box" style="margin-top:10px"><h3>Aprendizajes</h3>${field(`months.${month}.aprendizajes`, "¿Qué te dejó este arco?")}</div>
@@ -442,14 +521,20 @@ function renderQuarterClose(q) {
     .map((m) => {
       M(m);
       const mm = state.months[m] || {};
-      return `<a class="month-peek" href="#/cierre/${m}">
-        <img src="assets/hero-${pad(m)}.jpg" alt="">
-        <span>
-          <strong>${MONTHS[m - 1]}</strong>
-          <span class="hint" style="display:block;margin:0">${esc((mm.logros || "Sin cierre todavía").slice(0, 80))}</span>
-        </span>
-        <span class="go">›</span>
-      </a>`;
+      const ch = monthChar(m);
+      const nota = mm.nota ? `Nota ${mm.nota} / 7` : "Sin nota todavía";
+      return `<div class="month-peek-wrap">
+        <a class="month-peek" href="#/cierre/${m}">
+          <img src="${officialArt(m)}" alt="">
+          <span>
+            <strong>${MONTHS[m - 1]} · ${esc(ch.name)}</strong>
+            <span class="hint" style="display:block;margin:0">${esc(nota)}</span>
+          </span>
+          <span class="go">›</span>
+        </a>
+        <p class="grade-label">Evalúa ${MONTHS[m - 1]}</p>
+        ${gradePicker(`months.${m}.nota`)}
+      </div>`;
     })
     .join("");
   return `<section class="sheet">
@@ -479,9 +564,9 @@ function renderYear() {
       .map((m) => {
         const s = SAGAS[m - 1];
         return `<a href="#/mes/${m}">
-          <img src="assets/hero-${pad(m)}.jpg" alt="">
+          <img src="${officialArt(m)}" alt="">
           <span>
-            <strong>${MONTHS[m - 1]}</strong>
+            <strong>${MONTHS[m - 1]} · ${esc(monthChar(m).name)}</strong>
             <span class="hint" style="display:block;margin:0">${esc(s.title)}</span>
           </span>
           <span class="go">›</span>
@@ -534,6 +619,23 @@ function renderProfile() {
       <input class="field" data-store="personal.telefono" value="${esc(p.telefono || "")}">
       <h3>Contacto de emergencia</h3>
       ${field("personal.emergencia", "Nombre y teléfono", false)}
+    </div>
+    <div class="box" style="margin-top:10px">
+      <h3>Google Calendar</h3>
+      <p class="hint">Para que un evento exista aquí y en Google, conecta tu cuenta. Crea un ID de cliente OAuth (aplicación web) en Google Cloud, con estos orígenes autorizados:</p>
+      <ul class="hint-list">
+        <li>http://127.0.0.1:4173</li>
+        <li>https://raimundoibieta.github.io</li>
+      </ul>
+      <label class="field-label" for="gcal-client">ID de cliente</label>
+      <input class="field" id="gcal-client" value="${esc(gcalClientId())}" placeholder="xxxxx.apps.googleusercontent.com">
+      <div class="actions" style="margin-top:10px">
+        <button class="btn" type="button" data-act="gcal-save-client">Guardar ID</button>
+        ${gcalConnected()
+          ? `<button class="btn" type="button" data-act="gcal-disconnect">Desconectar</button>`
+          : `<button class="btn primary" type="button" data-act="gcal-connect">Conectar Google</button>`}
+      </div>
+      <p class="hint">${gcalConnected() ? "Conectado. Los eventos nuevos salen en ambos calendarios." : "Todavía no está conectado."}</p>
     </div>
     <div class="actions">
       <button class="btn" data-act="export">Exportar bitácora</button>
@@ -600,6 +702,13 @@ function route() {
   const mLink = document.getElementById("nav-mes");
   if (mLink) mLink.href = `#/mes/${ui.month}`;
   window.scrollTo(0, 0);
+  const pullMonth = parts[0] === "mes" || parts[0] === "cierre" || parts[0] === "dia" ? ui.month : 0;
+  if (pullMonth && gcalConnected() && !gcalPulled.has(pullMonth)) {
+    gcalPulled.add(pullMonth);
+    gcalPullMonth(YEAR, pullMonth).then((changed) => {
+      if (changed) route();
+    });
+  }
 }
 
 function onStoreInput(e) {
@@ -655,6 +764,25 @@ document.addEventListener("click", (e) => {
     location.hash = "#/";
     renderLogin();
   }
+  if (act.dataset.act === "gcal-connect") gcalConnect();
+  if (act.dataset.act === "gcal-disconnect") gcalDisconnect();
+  if (act.dataset.act === "gcal-save-client") {
+    const input = document.getElementById("gcal-client");
+    gcalSaveClient(input?.value || "");
+    toast(gcalEnabled() ? "ID guardado" : "ID borrado");
+    route();
+  }
+  if (act.dataset.act === "del-event") {
+    const dayIso = act.dataset.day;
+    const id = act.dataset.id;
+    const list = eventsOn(parseISO(dayIso));
+    const found = list.find((e) => e.id === id);
+    state.events[dayIso] = list.filter((e) => e.id !== id);
+    persist();
+    if (found?.gcalId) gcalRemove(found.gcalId);
+    route();
+    toast("Evento borrado");
+  }
 });
 
 document.addEventListener("change", (e) => {
@@ -665,6 +793,26 @@ document.addEventListener("change", (e) => {
 document.addEventListener("input", onStoreInput);
 
 document.addEventListener("submit", async (e) => {
+  const eventForm = e.target.closest("#event-form");
+  if (eventForm) {
+    e.preventDefault();
+    const title = eventForm.title.value.trim();
+    if (!title) return;
+    const dayIso = eventForm.dataset.day;
+    const list = eventsOn(parseISO(dayIso));
+    let ev = {
+      id: "e-" + Date.now(),
+      title,
+      start: eventForm.start.value,
+      end: eventForm.end.value
+    };
+    ev = await gcalPush(ev, dayIso);
+    list.push(ev);
+    persist();
+    route();
+    toast(gcalConnected() ? "Evento en ambos calendarios" : "Evento guardado");
+    return;
+  }
   const form = e.target.closest("#login-form");
   if (!form) return;
   e.preventDefault();
@@ -682,7 +830,11 @@ document.addEventListener("submit", async (e) => {
 });
 
 window.addEventListener("hashchange", route);
-document.addEventListener("DOMContentLoaded", route);
+document.addEventListener("DOMContentLoaded", () => {
+  gcalInit();
+  route();
+});
+window.addEventListener("load", gcalInit);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") persist();
 });

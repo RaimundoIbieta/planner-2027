@@ -130,7 +130,17 @@ const NAKAMAS = [
   { id: "sabo", name: "Sabo" }
 ];
 
-const MONTH_JOLLY = [
-  "luffy", "chopper", "zoro", "robin", "brook", "ace",
-  "jinbe", "franky", "sanji", "luffy", "robin", "sabo"
+const MONTH_CHAR = [
+  { id: "luffy", name: "Luffy" },
+  { id: "nami", name: "Nami" },
+  { id: "usopp", name: "Usopp" },
+  { id: "robin", name: "Robin" },
+  { id: "brook", name: "Brook" },
+  { id: "ace", name: "Ace" },
+  { id: "jinbe", name: "Jinbe" },
+  { id: "law", name: "Law" },
+  { id: "sanji", name: "Sanji" },
+  { id: "zoro", name: "Zoro" },
+  { id: "franky", name: "Franky" },
+  { id: "sabo", name: "Sabo" }
 ];
