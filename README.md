@@ -4,29 +4,29 @@ Bitácora personal 2027.
 
 **Sitio:** https://raimundoibieta.github.io/planner-2027/
 
-Entra con tu correo y tu clave. Las notas de este despliegue se guardan en el navegador de cada dispositivo. Para que iPhone y Chrome compartan la misma bitácora hace falta una base gratuita (Supabase); ver abajo.
+Entra con tu correo y tu clave.
 
 ## Cómo usarlo
 
-- **Hoy:** escribe el día. Flechas o la tira Lun–Dom para cambiar.
-- **Mes:** toca un día del calendario.
-- **Año:** los 12 meses y las metas de cada trimestre.
+- **Hoy:** ánimo, lo importante y notas del día.
+- **Mes:** calendario, objetivo y **cierre de mes** (logros, aprendizajes, mejoras, pendientes).
+- **Año:** los 12 meses y el **cierre de cada trimestre**.
 - **Perfil:** tus datos y exportar/importar.
 
 En el iPhone: Safari → Compartir → Añadir a pantalla de inicio.
 
-## Base de datos gratuita (para sincronizar)
+## Base de datos (cuando sincronices iPhone y Chrome)
 
-GitHub Pages no tiene servidor. Si quieres que lo que escribas en el celular aparezca en el computador (y al revés), crea un proyecto gratis en:
+GitHub Pages no trae servidor. **No uses Supabase** si ya llegaste al tope de proyectos.
 
-**https://supabase.com**
+Crea una cuenta **gratis** en Firebase (plan Spark), con el mismo Gmail:
 
-1. Sign up → **New project**
-2. Nombre: `planner-2027`
-3. Guarda la contraseña de la base
-4. En **Settings → API** copia:
-   - Project URL
-   - anon public key
-5. Pásame esas dos claves y conecto el login y la bitácora a esa base.
+**https://console.firebase.google.com**
 
-Plan gratuito (Free): alcanza de sobra para un planner personal.
+1. **Add project** → nombre `planner-2027`
+2. **Authentication** → Email/Password → Enable
+3. **Firestore Database** → Create (modo de prueba)
+4. Ícono de engrane → **Project settings** → tus apps → **Web** (`</>`) → copia el `firebaseConfig`
+5. Pásame ese bloque y conecto login + bitácora
+
+Plan Spark es gratis para un planner personal. No hace falta tarjeta.

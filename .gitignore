@@ -1,5 +1,6 @@
 .venv/
 ref/
+Imagenes/
 .DS_Store
 *.pdf
 __pycache__/

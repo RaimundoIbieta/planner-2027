@@ -106,3 +106,31 @@ const QUARTERS_LORE = [
     blurb: "Wano, Egghead y Elbaf: Gear 5, el Siglo Vacío y la recta final hacia Laugh Tale."
   }
 ];
+
+const MOODS = [
+  { id: "1", label: "Zzz", desc: "Relajado" },
+  { id: "2", label: "Alegre", desc: "Con energía" },
+  { id: "3", label: "En duda", desc: "Preocupado" },
+  { id: "4", label: "Fuego", desc: "Furioso" },
+  { id: "5", label: "A luchar", desc: "Determinado" }
+];
+
+const NAKAMAS = [
+  { id: "luffy", name: "Luffy" },
+  { id: "zoro", name: "Zoro" },
+  { id: "nami", name: "Nami" },
+  { id: "usopp", name: "Usopp" },
+  { id: "sanji", name: "Sanji" },
+  { id: "chopper", name: "Chopper" },
+  { id: "robin", name: "Robin" },
+  { id: "franky", name: "Franky" },
+  { id: "brook", name: "Brook" },
+  { id: "jinbe", name: "Jinbe" },
+  { id: "ace", name: "Ace" },
+  { id: "sabo", name: "Sabo" }
+];
+
+const MONTH_JOLLY = [
+  "luffy", "chopper", "zoro", "robin", "brook", "ace",
+  "jinbe", "franky", "sanji", "luffy", "robin", "sabo"
+];

@@ -121,7 +121,8 @@ function Q(n) {
     resumen: ["", "", ""],
     logros: "",
     pendientes: "",
-    aprendizajes: ""
+    aprendizajes: "",
+    mejoras: ""
   };
   if (!Array.isArray(state.quarters[n].checklist)) {
     state.quarters[n].checklist = Array.from({ length: 10 }, () => ({ done: false, text: "" }));
@@ -139,7 +140,14 @@ function M(n) {
     tareas: "",
     checklist: "",
     notas: "",
-    importante: ""
+    importante: "",
+    logros: "",
+    aprendizajes: "",
+    mejoras: "",
+    pendientes: "",
+    gracias: "",
+    nakama: "",
+    animo: ""
   };
   return state.months[n];
 }
@@ -196,6 +204,41 @@ function field(path, placeholder = "", multiline = true) {
   return `<input class="field" data-store="${path}" value="${esc(val)}" placeholder="${placeholder}">`;
 }
 
+function jollyFor(month) {
+  return `assets/jolly-${MONTH_JOLLY[month - 1]}.jpg`;
+}
+
+function moodPicker(path) {
+  const current = String(getPath(path) || "");
+  return `<div class="mood-row">${MOODS.map(
+    (m) => `<label class="mood ${current === m.id ? "on" : ""}">
+      <input type="radio" name="${path}" data-store="${path}" value="${m.id}" ${current === m.id ? "checked" : ""}>
+      <strong>${m.label}</strong>
+      <small>${m.desc}</small>
+    </label>`
+  ).join("")}</div>`;
+}
+
+function nakamaPicker(path) {
+  const current = String(getPath(path) || "");
+  return `<div class="nakama-row">${NAKAMAS.map(
+    (n) => `<label class="nakama ${current === n.id ? "on" : ""}">
+      <input type="radio" name="${path}" data-store="${path}" value="${n.id}" ${current === n.id ? "checked" : ""}>
+      <img src="assets/jolly-${n.id}.jpg" alt="">
+      <span>${n.name}</span>
+    </label>`
+  ).join("")}</div>`;
+}
+
+function monthTabs(month, tab) {
+  const q = Math.ceil(month / 3);
+  return `<nav class="nav-pills">
+    <a class="${tab === "plan" ? "active" : ""}" href="#/mes/${month}">Plan</a>
+    <a class="${tab === "cierre" ? "active" : ""}" href="#/cierre/${month}">Cierre de mes</a>
+    <a href="#/qcierre/${q}">Cierre Q${q}</a>
+  </nav>`;
+}
+
 function isAuthed() {
   return localStorage.getItem(AUTH_KEY) === AUTH_HASH;
 }
@@ -210,7 +253,7 @@ function renderLogin(error = "") {
   document.getElementById("app").innerHTML = `<section class="login-screen">
     <form class="login-card" id="login-form" autocomplete="on">
       <p class="kicker">Bitácora del capitán</p>
-      <img class="hero-logo" src="assets/logo.jpg" alt="One Piece">
+      <img class="hero-logo" src="assets/cover.jpg" alt="One Piece">
       <h1>Planner 2027</h1>
       <p class="hint">Acceso personal</p>
       <div class="login-fields">
@@ -281,6 +324,14 @@ function renderDay(date) {
   ui.month = month;
   ui.week = week.id;
   ui.quarter = Math.ceil(month / 3);
+  const last = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+  const closeHint =
+    day.getFullYear() === YEAR && day.getDate() >= last - 2
+      ? `<a class="saga-chip" href="#/cierre/${month}" style="margin-top:12px">
+          <img src="${jollyFor(month)}" alt="">
+          <span><strong>Cierra ${MONTHS[month - 1]}</strong><span>Logros, aprendizajes y pendientes</span></span>
+        </a>`
+      : "";
   return `<section class="sheet">
     ${countdown}
     <div class="day-nav">
@@ -292,15 +343,18 @@ function renderDay(date) {
       <a class="nav-arrow" href="#/dia/${iso(next)}" aria-label="Día siguiente">›</a>
     </div>
     <div class="week-strip">${strip}</div>
-    <p class="hint" style="margin:-4px 0 12px">Cambia de día con las flechas o tocando Lun–Dom.</p>
     <a class="saga-chip" href="#/mes/${month}">
-      <img src="assets/cal-${pad(month)}.jpg" alt="">
+      <img src="assets/hero-${pad(month)}.jpg" alt="">
       <span>
         <strong>${esc(saga.title)}</strong>
         <span>${MONTHS[month - 1]} · ${esc(saga.arc)}</span>
       </span>
     </a>
-    <div class="box priority">
+    <div class="box">
+      <h3>¿Cómo vas hoy?</h3>
+      ${moodPicker(`days.${iso(day)}.mood`)}
+    </div>
+    <div class="box priority" style="margin-top:10px">
       <h3>Lo importante hoy</h3>
       ${field(`days.${iso(day)}.plan`, "1, 2 o 3 cosas. Nada más.", true)}
     </div>
@@ -308,6 +362,7 @@ function renderDay(date) {
       <h3>Notas del día</h3>
       ${field(`days.${iso(day)}.log`, "Escribe aquí. Se guarda solo.", true)}
     </div>
+    ${closeHint}
   </section>`;
 }
 
@@ -319,6 +374,7 @@ function renderMonth(month) {
   ui.month = month;
   ui.quarter = Math.ceil(month / 3);
   return `<section class="sheet">
+    ${monthTabs(month, "plan")}
     <div class="day-nav">
       <a class="nav-arrow" href="#/mes/${prev}">‹</a>
       <h1>
@@ -327,6 +383,7 @@ function renderMonth(month) {
       </h1>
       <a class="nav-arrow" href="#/mes/${next}">›</a>
     </div>
+    <img class="hero-banner" src="assets/hero-${pad(month)}.jpg" alt="${esc(saga.title)}">
     ${fullCalendar(month)}
     <p class="hint" style="margin:8px 0 12px">Toca un día para escribir. El punto dorado marca los que ya tienen notas.</p>
     <details class="lore">
@@ -343,6 +400,74 @@ function renderMonth(month) {
       <h3>Tareas</h3>
       ${field(`months.${month}.tareas`, "Lista corta")}
     </div>
+    <a class="btn primary" href="#/cierre/${month}" style="display:block;text-align:center;margin-top:14px">Cerrar ${MONTHS[month - 1]}</a>
+  </section>`;
+}
+
+function renderMonthClose(month) {
+  M(month);
+  const saga = SAGAS[month - 1];
+  const q = Math.ceil(month / 3);
+  ui.month = month;
+  ui.quarter = q;
+  return `<section class="sheet">
+    ${monthTabs(month, "cierre")}
+    <img class="hero-banner" src="assets/hero-${pad(month)}.jpg" alt="">
+    <p class="kicker">${esc(saga.arc)}</p>
+    <h1 class="page-title">Cierre de ${MONTHS[month - 1]}</h1>
+    <p class="q-blurb">${esc(saga.title)}</p>
+    <div class="box">
+      <h3>Nakama del mes</h3>
+      <p class="hint">¿Quién representó tu mes?</p>
+      ${nakamaPicker(`months.${month}.nakama`)}
+    </div>
+    <div class="box" style="margin-top:10px">
+      <h3>Ánimo del mes</h3>
+      ${moodPicker(`months.${month}.animo`)}
+    </div>
+    <div class="box" style="margin-top:10px"><h3>Logros</h3>${field(`months.${month}.logros`, "¿Qué conquistaste?")}</div>
+    <div class="box" style="margin-top:10px"><h3>Aprendizajes</h3>${field(`months.${month}.aprendizajes`, "¿Qué te dejó este arco?")}</div>
+    <div class="box" style="margin-top:10px"><h3>Mejoras</h3>${field(`months.${month}.mejoras`, "¿Qué harías distinto el próximo mes?")}</div>
+    <div class="box" style="margin-top:10px"><h3>Pendientes</h3>${field(`months.${month}.pendientes`, "Qué se va al siguiente mes")}</div>
+    <div class="box" style="margin-top:10px"><h3>Agradecimientos</h3>${field(`months.${month}.gracias`, "Nakamas, personas, apoyos")}</div>
+    ${month % 3 === 0 ? `<a class="btn primary" href="#/qcierre/${q}" style="display:block;text-align:center;margin-top:14px">Seguir al cierre Q${q}</a>` : ""}
+  </section>`;
+}
+
+function renderQuarterClose(q) {
+  Q(q);
+  const months = [(q - 1) * 3 + 1, (q - 1) * 3 + 2, (q - 1) * 3 + 3];
+  const lore = QUARTERS_LORE[q - 1];
+  const peeks = months
+    .map((m) => {
+      M(m);
+      const mm = state.months[m] || {};
+      return `<a class="month-peek" href="#/cierre/${m}">
+        <img src="assets/hero-${pad(m)}.jpg" alt="">
+        <span>
+          <strong>${MONTHS[m - 1]}</strong>
+          <span class="hint" style="display:block;margin:0">${esc((mm.logros || "Sin cierre todavía").slice(0, 80))}</span>
+        </span>
+        <span class="go">›</span>
+      </a>`;
+    })
+    .join("");
+  return `<section class="sheet">
+    <nav class="nav-pills">
+      <a href="#/ano">Año</a>
+      ${[1, 2, 3, 4].map((n) => `<a class="${n === q ? "active" : ""}" href="#/qcierre/${n}">Q${n}</a>`).join("")}
+    </nav>
+    <img class="hero-banner" src="assets/qend-${pad(q)}.jpg" alt="Término Q${q}">
+    <p class="kicker">Término de arco</p>
+    <h1 class="page-title">Cierre Q${q}</h1>
+    <p class="q-blurb">${esc(lore.name)}. ${esc(lore.blurb)}</p>
+    <h3 class="label">Los tres meses</h3>
+    <div class="month-list">${peeks}</div>
+    <div class="box" style="margin-top:12px"><h3>Logros del trimestre</h3>${field(`quarters.${q}.logros`, "Las islas que sí tomaste")}</div>
+    <div class="box" style="margin-top:10px"><h3>Aprendizajes</h3>${field(`quarters.${q}.aprendizajes`, "Qué te enseñó este arco")}</div>
+    <div class="box" style="margin-top:10px"><h3>Mejoras</h3>${field(`quarters.${q}.mejoras`, "Rumbo distinto para el próximo Q")}</div>
+    <div class="box" style="margin-top:10px"><h3>Pendientes</h3>${field(`quarters.${q}.pendientes`, "Lo que sigue a bordo")}</div>
+    ${q === 4 ? `<div class="box" style="margin-top:10px"><h3>Cierre del año</h3>${field(`quarters.4.notas`, "¿Llegaste más cerca de tu One Piece?")}</div>` : ""}
   </section>`;
 }
 
@@ -354,7 +479,7 @@ function renderYear() {
       .map((m) => {
         const s = SAGAS[m - 1];
         return `<a href="#/mes/${m}">
-          <img src="assets/cal-${pad(m)}.jpg" alt="">
+          <img src="assets/hero-${pad(m)}.jpg" alt="">
           <span>
             <strong>${MONTHS[m - 1]}</strong>
             <span class="hint" style="display:block;margin:0">${esc(s.title)}</span>
@@ -381,6 +506,7 @@ function renderYear() {
         <summary>Metas del trimestre</summary>
         ${items}
       </details>
+      <a class="btn" href="#/qcierre/${q + 1}" style="display:block;text-align:center;margin-top:8px">Cierre Q${q + 1}</a>
     </section>`;
   });
   return `<section class="sheet">
@@ -449,6 +575,14 @@ function route() {
   } else if (parts[0] === "yo") {
     html = renderProfile();
     view = "yo";
+  } else if (parts[0] === "cierre") {
+    const m = Math.min(12, Math.max(1, Number(parts[1]) || 1));
+    html = renderMonthClose(m);
+    view = "mes";
+  } else if (parts[0] === "qcierre") {
+    const q = Math.min(4, Math.max(1, Number(parts[1]) || 1));
+    html = renderQuarterClose(q);
+    view = "ano";
   } else if (parts[0] === "dia") {
     html = renderDay(parseISO(parts[1]));
     view = "hoy";
@@ -473,6 +607,11 @@ function onStoreInput(e) {
   if (!el) return;
   if (el.type === "checkbox") setPath(el.dataset.store, el.checked);
   else setPath(el.dataset.store, el.value);
+  if (el.type === "radio") {
+    document.querySelectorAll(`input[name="${el.name}"]`).forEach((r) => {
+      r.closest("label")?.classList.toggle("on", r.checked);
+    });
+  }
 }
 
 function exportState() {
