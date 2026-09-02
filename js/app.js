@@ -277,12 +277,13 @@ function officialArt(month) {
 
 function monthHead(month, hrefBase = "mes", title = "") {
   const saga = SAGAS[month - 1];
+  const ch = monthChar(month);
   const prev = month === 1 ? 12 : month - 1;
   const next = month === 12 ? 1 : month + 1;
   return `<header class="month-head">
     <img src="${officialArt(month)}" alt="${esc(saga.title)}">
     <div class="month-head-copy">
-      <p class="kicker">${esc(saga.arc)}</p>
+      <p class="kicker">${esc(saga.arc)} · ${esc(ch.name)}</p>
       <div class="day-nav tight">
         <a class="nav-arrow" href="#/${hrefBase}/${prev}" aria-label="Anterior">‹</a>
         <h1>${title || MONTHS[month - 1]}</h1>

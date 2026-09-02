@@ -117,19 +117,20 @@ const MOODS = [
 
 const NAKAMAS = [
   { id: "luffy", name: "Luffy" },
-  { id: "zoro", name: "Zoro" },
   { id: "nami", name: "Nami" },
   { id: "usopp", name: "Usopp" },
-  { id: "sanji", name: "Sanji" },
-  { id: "chopper", name: "Chopper" },
   { id: "robin", name: "Robin" },
-  { id: "franky", name: "Franky" },
   { id: "brook", name: "Brook" },
-  { id: "jinbe", name: "Jinbe" },
   { id: "ace", name: "Ace" },
+  { id: "jinbe", name: "Jinbe" },
+  { id: "chopper", name: "Chopper" },
+  { id: "sanji", name: "Sanji" },
+  { id: "zoro", name: "Zoro" },
+  { id: "franky", name: "Franky" },
   { id: "sabo", name: "Sabo" }
 ];
 
+/** Un nakama por mes. Igual que el PDF de imprenta. */
 const MONTH_CHAR = [
   { id: "luffy", name: "Luffy" },
   { id: "nami", name: "Nami" },
@@ -138,7 +139,7 @@ const MONTH_CHAR = [
   { id: "brook", name: "Brook" },
   { id: "ace", name: "Ace" },
   { id: "jinbe", name: "Jinbe" },
-  { id: "law", name: "Law" },
+  { id: "chopper", name: "Chopper" },
   { id: "sanji", name: "Sanji" },
   { id: "zoro", name: "Zoro" },
   { id: "franky", name: "Franky" },
