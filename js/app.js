@@ -6,7 +6,6 @@ const MONTHS = [
 ];
 const DOW = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DOW_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const AUTH_KEY = "op-planner-2027-auth";
 
 const ui = { month: 1, week: 1, quarter: 1 };
 const gcalPulled = new Set();
@@ -335,12 +334,7 @@ function monthTabs(month, tab) {
 }
 
 function isAuthed() {
-  return localStorage.getItem(AUTH_KEY) === AUTH_HASH;
-}
-
-async function sha256Hex(text) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return cloudUser()?.email?.toLowerCase() === AUTH_EMAIL;
 }
 
 function renderBoot() {
@@ -693,12 +687,12 @@ function setActiveNav(view) {
 }
 
 function route() {
-  if (!isAuthed()) {
-    renderLogin();
-    return;
-  }
   if (cloudEnabled() && !firebaseAuthReady) {
     renderBoot();
+    return;
+  }
+  if (!isAuthed()) {
+    renderLogin();
     return;
   }
   if (cloudEnabled() && !cloudUser()) {
@@ -804,7 +798,6 @@ document.addEventListener("click", (e) => {
   if (act.dataset.act === "export") exportState();
   if (act.dataset.act === "import") document.getElementById("import-file").click();
   if (act.dataset.act === "logout") {
-    localStorage.removeItem(AUTH_KEY);
     cloudLogout();
     location.hash = "#/";
     renderLogin();
@@ -876,9 +869,7 @@ document.addEventListener("submit", async (e) => {
     btn.disabled = true;
     btn.textContent = "Entrando...";
   }
-  const hash = await sha256Hex(`op-planner-2027|${email}|${pass}`);
-  if (email === AUTH_EMAIL && hash === AUTH_HASH) {
-    localStorage.setItem(AUTH_KEY, AUTH_HASH);
+  if (email === AUTH_EMAIL) {
     const cloudOk = await cloudLogin(email, pass);
     if (!cloudOk) {
       renderLogin(lastCloudError || "No se pudo enlazar la nube. Revisa el mensaje e inténtalo otra vez.");

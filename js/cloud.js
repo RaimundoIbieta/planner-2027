@@ -119,46 +119,27 @@ function richness(s) {
 }
 
 async function cloudLogin(email, password) {
-  if (!cloudEnabled()) return false;
+  if (!cloudEnabled()) {
+    lastCloudError = "No se pudo cargar Firebase. Revisa tu conexión y recarga la página.";
+    return false;
+  }
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   try {
     await firebase.auth().signInWithEmailAndPassword(email, password);
     lastCloudError = "";
     return true;
   } catch (err) {
-    const code = err?.code || "";
-    if (
-      code === "auth/user-not-found" ||
-      code === "auth/invalid-credential" ||
-      code === "auth/invalid-login-credentials"
-    ) {
-      try {
-        await firebase.auth().createUserWithEmailAndPassword(email, password);
-        lastCloudError = "";
-        return true;
-      } catch (createErr) {
-        if (createErr?.code === "auth/email-already-in-use") {
-          try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
-            lastCloudError = "";
-            return true;
-          } catch {
-            lastCloudError = "La clave de Firebase no coincide. Entra con la misma clave en todos los aparatos.";
-          }
-        } else if (createErr?.code === "auth/unauthorized-domain") {
-          lastCloudError = "En Firebase → Authentication → Settings → Authorized domains agrega raimundoibieta.github.io";
-        } else {
-          lastCloudError = createErr?.message || "No se pudo crear la cuenta en la nube.";
-        }
-        console.warn(createErr);
-        return false;
-      }
-    }
-    if (code === "auth/unauthorized-domain") {
-      lastCloudError = "En Firebase → Authentication → Settings → Authorized domains agrega raimundoibieta.github.io";
-    } else {
-      lastCloudError = err?.message || "La nube no conectó.";
-    }
+    const messages = {
+      "auth/user-not-found": "Correo o contraseña incorrectos. Usa tu contraseña actual de Firebase.",
+      "auth/wrong-password": "Correo o contraseña incorrectos. Usa tu contraseña actual de Firebase.",
+      "auth/invalid-credential": "Correo o contraseña incorrectos. Usa tu contraseña actual de Firebase.",
+      "auth/invalid-login-credentials": "Correo o contraseña incorrectos. Usa tu contraseña actual de Firebase.",
+      "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo otra vez.",
+      "auth/network-request-failed": "No se pudo conectar. Revisa tu conexión a internet.",
+      "auth/user-disabled": "Esta cuenta está deshabilitada en Firebase.",
+      "auth/unauthorized-domain": "Autoriza este dominio en Firebase → Authentication → Settings → Authorized domains."
+    };
+    lastCloudError = messages[err?.code] || "No se pudo iniciar sesión. Inténtalo otra vez.";
     console.warn(err);
     return false;
   }

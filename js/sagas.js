@@ -1,5 +1,4 @@
 const AUTH_EMAIL = "raimundoibieta@gmail.com";
-const AUTH_HASH = "aed9171def4aaf8f227cecdef7d9a9f8869a3628606da9bafaac328d16ac8e3f";
 
 const SAGAS = [
   {
